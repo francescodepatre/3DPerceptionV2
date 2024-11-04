@@ -1,5 +1,5 @@
 import freenect
-import cv2 
+import cv2
 import numpy as np
 from errorMessages import ErrorManager
 
@@ -8,27 +8,27 @@ class Kinect:
     def __init__(self):
         self.manager = ErrorManager()
 
-    def get_realtime_video():
-
+    def get_realtime_video(self):
         try:
-            rgb,_ = freenect.sync_get_video()
-
-            rgb = cv2.cvtColor(rgb,cv2.COLOR_RGB2BGR)
-
+            rgb, _ = freenect.sync_get_video()
+            rgb = cv2.cvtColor(rgb, cv2.COLOR_RGB2BGR)
             return rgb
-        
-        except Exception:
-            self.manager.log_exception(Exception)
-            self.manager.message_error(Exception)
-            
-    
-    def get_realtime_depth():
-        depth,_ = freenect.sync_get_depth()
-        depth = depth.astype(np.uint8)
-        return depth
-    
+        except Exception as e:
+            self.manager.log_exception()
+            self.manager.message_error()
+            return None
 
-    def calibra_kinect(pattern_size=(9, 6), square_size=0.025, save_file="kinect_calibration.npz"):
+    def get_realtime_depth(self):
+        try:
+            depth, _ = freenect.sync_get_depth()
+            depth = depth.astype(np.uint8)
+            return depth
+        except Exception as e:
+            self.manager.log_exception(e)
+            self.manager.message_error(e)
+            return None
+
+    def calibra_kinect(self, pattern_size=(9, 6), square_size=0.025, save_file="kinect_calibration.npz"):
         # Prepara i punti del mondo reale in base alla dimensione della scacchiera
         object_points = np.zeros((np.prod(pattern_size), 3), np.float32)
         object_points[:, :2] = np.indices(pattern_size).T.reshape(-1, 2)
@@ -94,16 +94,3 @@ class Kinect:
         # Salva i parametri su file per utilizzo successivo
         np.savez(save_file, mtx_rgb=mtx_rgb, dist_rgb=dist_rgb, mtx_depth=mtx_depth, dist_depth=dist_depth)
         print(f"Parametri di calibrazione salvati in '{save_file}'.")
-
-'''
-vecchio metodo calibrazione fra
-
-# Funzione di calibrazione per regolare l'angolo del Kinect
-def calibration(angle):
-    ctx = freenect.init()
-    device = freenect.open_device(ctx, 0)
-    freenect.set_tilt_degs(device, angle)
-    time.sleep(3)
-    freenect.close_device(device)
-    freenect.shutdown(ctx)
-'''
