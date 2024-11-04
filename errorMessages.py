@@ -12,7 +12,7 @@ class ErrorManager:
         error_message = f"Exception: {e}\nTraceback:\n{traceback.format_exc()}"
         logging.exception(error_message)
 
-    def message_error(message):
+    def message_error(self, message):
         root = tk.Tk()
         root.withdraw()
         messagebox.showerror('Errore', message)

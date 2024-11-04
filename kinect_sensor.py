@@ -15,7 +15,7 @@ class Kinect:
             return rgb
         except Exception as e:
             self.manager.log_exception()
-            self.manager.message_error()
+            self.manager.message_error("Impossibile comunicare con il sensore.")
             return None
 
     def get_realtime_depth(self):
