@@ -18,8 +18,8 @@ def save_yolo_annotation(filename, bbox, class_id=0):
         x_center, y_center, width, height = bbox
         f.write(f"{class_id}, {x_center}, {y_center}, {width}, {height}\n")
 
-rgb_save_folder = './rgb/'
-depth_save_folder = './depth/'
+rgb_save_folder = '/media/francesco-de-patre/SABRENT/rgb/'
+depth_save_folder = '/media/francesco-de-patre/SABRENT/depth/'
 
 frame_count = 0
 

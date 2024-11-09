@@ -29,21 +29,21 @@ class Kinect:
             return None
 
     def calibra_kinect(self, pattern_size=(9, 6), square_size=0.025, save_file="kinect_calibration.npz"):
-        # Prepara i punti del mondo reale in base alla dimensione della scacchiera
+        
         object_points = np.zeros((np.prod(pattern_size), 3), np.float32)
         object_points[:, :2] = np.indices(pattern_size).T.reshape(-1, 2)
         object_points *= square_size
 
-        # Array per memorizzare i punti trovati
-        obj_points = []  # Punti 3D nel mondo reale
-        img_points_rgb = []  # Punti 2D nell'immagine RGB
-        img_points_depth = []  # Punti 2D nell'immagine di profondità
+        
+        obj_points = [] 
+        img_points_rgb = [] 
+        img_points_depth = []
 
         print("Posiziona la scacchiera in diverse posizioni davanti al Kinect e premi 's' per catturare.")
         print("Premi 'q' per terminare l'acquisizione e avviare la calibrazione.")
 
         while True:
-            # Acquisisce i frame RGB e di profondità
+            
             rgb_frame, _ = freenect.sync_get_video()
             depth_frame, _ = freenect.sync_get_depth()
 
@@ -51,7 +51,6 @@ class Kinect:
             gray_rgb = cv2.cvtColor(rgb_frame, cv2.COLOR_BGR2GRAY)
             depth_frame = depth_frame.astype(np.uint8)
 
-            # Trova i punti della scacchiera nell'immagine RGB
             ret_rgb, corners_rgb = cv2.findChessboardCorners(gray_rgb, pattern_size)
 
             if ret_rgb:
@@ -62,7 +61,7 @@ class Kinect:
 
             key = cv2.waitKey(1) & 0xFF
             if key == ord('s') and ret_rgb:
-                # Memorizza i punti se la scacchiera è stata trovata
+
                 obj_points.append(object_points)
                 img_points_rgb.append(corners_rgb)
                 img_points_depth.append(corners_rgb)
@@ -74,7 +73,7 @@ class Kinect:
 
         cv2.destroyAllWindows()
 
-        # Calibrazione della fotocamera RGB e di profondità
+
         ret_rgb, mtx_rgb, dist_rgb, rvecs_rgb, tvecs_rgb = cv2.calibrateCamera(
             obj_points, img_points_rgb, gray_rgb.shape[::-1], None, None
         )
@@ -82,7 +81,7 @@ class Kinect:
             obj_points, img_points_depth, depth_frame.shape[::-1], None, None
         )
 
-        # Stampa i risultati della calibrazione
+
         print("Calibrazione RGB:")
         print("Matrice intrinseca:", mtx_rgb)
         print("Coefficiente di distorsione:", dist_rgb)
@@ -91,6 +90,6 @@ class Kinect:
         print("Matrice intrinseca:", mtx_depth)
         print("Coefficiente di distorsione:", dist_depth)
 
-        # Salva i parametri su file per utilizzo successivo
+
         np.savez(save_file, mtx_rgb=mtx_rgb, dist_rgb=dist_rgb, mtx_depth=mtx_depth, dist_depth=dist_depth)
-        print(f"Parametri di calibrazione salvati in '{save_file}'.")
+        print(f"Parametri di calibrazione salvati in -> '{save_file}'.")
