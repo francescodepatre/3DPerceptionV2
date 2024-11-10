@@ -51,7 +51,7 @@ def update_map(kinect_lat, kinect_lon, face_positions):
             color='red',
             fill=True,
             fill_color='red',
-            fill_opacity=0.9,
+            fill_opacity=0.4,
             popup=popup
         ).add_to(m)
 
