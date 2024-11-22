@@ -20,8 +20,8 @@ current_timestamp = date.timestamp()
 
 model_yolo = YOLO("last.pt")
 
-cap_rgb = cv2.VideoCapture('0_rgb.mp4')  
-cap_depth = cv2.VideoCapture('0_depth.mp4') 
+cap_rgb = cv2.VideoCapture('5_rgb.mp4')  
+cap_depth = cv2.VideoCapture('5_depth.mp4') 
 
 with open('obj.names', 'r') as f:
     classes = [line.strip() for line in f.readlines()]
@@ -87,11 +87,14 @@ model.eval()
 frame_width = int(cap_rgb.get(cv2.CAP_PROP_FRAME_WIDTH))
 frame_height = int(cap_rgb.get(cv2.CAP_PROP_FRAME_HEIGHT))
 fps = cap_rgb.get(cv2.CAP_PROP_FPS)
-
+counter = 0
+sequence_length = 10
 while True:
     ret_rgb, rgb_image = cap_rgb.read()
     ret_depth, depth_map = cap_depth.read()
-
+    rgb_sequence = []
+    numeric_sequence = []
+    counter += 1
     if not ret_rgb or not ret_depth:
         break
 
@@ -141,6 +144,7 @@ while True:
             try:
                 frame_rgb_tensor = transform(cropped_face)  # Risultato: [3, 224, 224]
                 frame_rgb_tensor = frame_rgb_tensor.unsqueeze(0).to(device)  # Aggiungi una dimensione per il batch: [1, 3, 224, 224]
+                rgb_sequence.append(frame_rgb_tensor)
             except Exception as e:
                 print(f"Errore durante la trasformazione dell'immagine: {e}")
                 continue
@@ -148,12 +152,14 @@ while True:
             # Prepara i dati numerici
             numeric_data = [distance_meters, latitude, longitude, angle]
             numeric_tensor = torch.tensor(numeric_data, dtype=torch.float32).unsqueeze(0).to(device)  # Deve avere dimensioni [1, 4]
-
-            # Passa l'immagine e i dati numerici al modello
+            numeric_sequence.append(numeric_tensor)
+            #if (counter % sequence_length) == 0:
+            rgb_sequence_tensor = torch.stack(rgb_sequence).unsqueeze(0).to(device)  # Forma: [1, seq_length, 3, 224, 224]
+            numeric_sequence_tensor = torch.stack(numeric_sequence).unsqueeze(0).to(device)  # Forma: [1, seq_length, 4]
             with torch.no_grad():
                 prediction = model(frame_rgb_tensor, numeric_tensor)
-                predicted_distance = prediction.item()*2.5
-                print(f"Predicted distance: {predicted_distance:.2f} m")
+                predicted_distance = prediction.item()*2
+                print(f"Predicted distance: {predicted_distance:.2f} m; ID: {next_id}")
                 angle_rel = calcola_angolo(x)
                 face_positions.append([predicted_distance, angle_rel, next_id])
                 cv2.rectangle(rgb_image, (x1, y1), (x2, y2), (0, 255, 0), 2)
@@ -162,6 +168,24 @@ while True:
                 cv2.putText(rgb_image, f"Distance: {predicted_distance:.2f} m",
                             (x1, y1 - 25), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 0), 2)
                 next_id += 1
+
+            if (counter % sequence_length) == 0:
+                rgb_sequence.clear()
+                numeric_sequence.clear()
+            # Passa l'immagine e i dati numerici al modello
+            '''else:
+                with torch.no_grad():
+                    prediction = model(frame_rgb_tensor, numeric_tensor)
+                    predicted_distance = prediction.item()*2.5
+                    print(f"Predicted distance: {predicted_distance:.2f} m; ID: {next_id}")
+                    angle_rel = calcola_angolo(x)
+                    face_positions.append([predicted_distance, angle_rel, next_id])
+                    cv2.rectangle(rgb_image, (x1, y1), (x2, y2), (0, 255, 0), 2)
+                    cv2.putText(rgb_image, f"Human Face ID:{next_id}",
+                                (x1, y1 - 10), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 0), 2)
+                    cv2.putText(rgb_image, f"Distance: {predicted_distance:.2f} m",
+                                (x1, y1 - 25), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 0), 2)
+                    next_id += 1'''
 
     if latitude is not None and longitude is not None:
         update_map(latitude, longitude, face_positions, angle)

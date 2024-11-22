@@ -7,9 +7,11 @@ import numpy as np
 from tqdm import tqdm
 from ultralytics import YOLO
 import itertools
+import MultiModalModel
+import torchvision.transforms as transforms
 
 
-class MultiModalLSTMModel(nn.Module):
+'''class MultiModalLSTMModel(nn.Module):
     def __init__(self):
         super(MultiModalLSTMModel, self).__init__()
         # Feature extractor per RGB
@@ -51,11 +53,12 @@ class MultiModalLSTMModel(nn.Module):
         output = self.fc_final(final_out)  # Forma: [batch_size, 1]
 
         return output
+'''
 if __name__ == "__main__":
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
     # Carica il modello salvato e spostalo sulla GPU (se disponibile)
-    model = MultiModalLSTMModel().to(device)
+    model = MultiModalModel.MultiModalLSTMModel().to(device)
     model.load_state_dict(torch.load("model.pth", map_location=device))
     model.eval()  # Modalità valutazione
     yolo_model = YOLO("last.pt")
@@ -84,7 +87,10 @@ if __name__ == "__main__":
     # Variabili per tracciare l'errore
     total_error = 0.0
     total_predictions = 0
-
+    rgb_sequence = []
+    numeric_sequence = []
+    counter = 0
+    sequence_length = 10
     # Loop attraverso i frame del video
     frame_idx = 0
     with tqdm(total=int(video_rgb.get(cv2.CAP_PROP_FRAME_COUNT)), desc="Evaluating frames") as pbar:
@@ -107,7 +113,12 @@ if __name__ == "__main__":
                     if i >= len(frame_distances):
                         # Se ci sono più bounding box di quelle annotate, ignorale
                         break
-
+                    transform = transforms.Compose([
+                        transforms.ToPILImage(),  # Converte l'immagine OpenCV (numpy array) in PIL
+                        transforms.Resize((224, 224)),  # Ridimensiona l'immagine a 224x224
+                        transforms.ToTensor(),  # Converte l'immagine PIL in Tensor (con dimensioni [C, H, W])
+                        transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])  # Normalizza come richiesto da ResNet
+                    ])
                     x_min, y_min, x_max, y_max = map(int, box.xyxy[0])
 
                     # Ritaglio dell'immagine della bounding box
@@ -118,11 +129,14 @@ if __name__ == "__main__":
                         continue
 
                     # Resize e preparazione per il modello
-                    cropped_face = cv2.resize(cropped_face, (224, 224))
-                    cropped_face_tensor = torch.tensor(cropped_face, dtype=torch.float32).permute(2, 0, 1).unsqueeze(0).to(device)
-
+                    #cropped_face = cv2.resize(cropped_face, (224, 224))
+                    #cropped_face_tensor = torch.tensor(cropped_face, dtype=torch.float32).permute(2, 0, 1).unsqueeze(0).to(device)
+                    frame_rgb_tensor = transform(cropped_face)  # Risultato: [3, 224, 224]
+                    frame_rgb_tensor = frame_rgb_tensor.unsqueeze(0).to(device)  # Aggiungi una dimensione per il batch: [1, 3, 224, 224]
+                    rgb_sequence.append(frame_rgb_tensor)
+                    #rgb_sequence.append(cropped_face_tensor)
                     # Estrazione delle feature RGB
-                    rgb_feat = model.cnn_rgb(cropped_face_tensor)
+                    #rgb_feat = model.cnn_rgb(cropped_face_tensor)
 
                     # Ottieni i dati GPS simulati e orientamento della bussola (esempio)
                     gps_data = [45.464203, 9.189982]
@@ -132,19 +146,22 @@ if __name__ == "__main__":
                     depth_value = frame_distances[i]
                     numeric_data = [depth_value, gps_data[0], gps_data[1], compass_orientation]
                     numeric_tensor = torch.tensor(numeric_data, dtype=torch.float32).unsqueeze(0).to(device)
-
+                    numeric_sequence.append(numeric_tensor)
                     # Estrazione delle feature numeriche
-                    num_feat = model.fc_numeric(numeric_tensor)
+                    #num_feat = model.fc_numeric(numeric_tensor)
 
                     # Passa le feature al modello per ottenere la predizione
-                    prediction = model(rgb_feat, num_feat)
-
+                    #prediction = model(rgb_feat, num_feat)
+                    prediction = model(rgb_sequence, numeric_sequence)
                     # Calcola l'errore per ogni bounding box
                     prediction_value = prediction.item()*2.5  # Converti il tensor in un singolo valore
                     error = abs(prediction_value - depth_value)
                     total_error += error
                     total_predictions += 1
-
+                    counter +=1
+                    if (counter % sequence_length) == 0:
+                        rgb_sequence.clear()
+                        numeric_sequence.clear() 
                     # Aggiungi la predizione alla lista
                     predictions.append(prediction_value)
 
