@@ -20,11 +20,12 @@ current_timestamp = date.timestamp()
 
 model_yolo = YOLO("last.pt")
 
-cap_rgb = cv2.VideoCapture('5_rgb.mp4')  
-cap_depth = cv2.VideoCapture('5_depth.mp4') 
+cap_rgb = cv2.VideoCapture('5_dance_rgb.mp4')  
+cap_depth = cv2.VideoCapture('5_dance_depth.mp4') 
 
 with open('obj.names', 'r') as f:
     classes = [line.strip() for line in f.readlines()]
+
 
 next_id = 0
 #fov camera 60° quindi -30°,+30°
@@ -38,7 +39,16 @@ def get_location(file_path):
     except (IOError, ValueError) as e:
         print(f"Errore nella lettura del file o nel parsing delle coordinate: {e}")
         return None, None
-
+    
+def compass_face(file_path):
+    try:
+        with open(file_path, 'r') as file:
+            comp = float(file.readline().strip())
+            return comp
+    except (IOError, ValueError) as e:
+        print(f"Errore nella lettura del file o nel parsing delle coordinate: {e}")
+        return None
+    
 def calcola_angolo(x):
     width = int(cap_rgb.get(cv2.CAP_PROP_FRAME_WIDTH))
     cx=width/2
@@ -76,7 +86,7 @@ def update_map(kinect_lat, kinect_lon, face_positions, angle):
 
 latitude, longitude = get_location('GPS_location_data.txt')
 
-angle=28.12
+angle=compass_face('Compass.txt')
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 model = MultiModalModel.MultiModalLSTMModel().to(device)
@@ -158,7 +168,7 @@ while True:
             numeric_sequence_tensor = torch.stack(numeric_sequence).unsqueeze(0).to(device)  # Forma: [1, seq_length, 4]
             with torch.no_grad():
                 prediction = model(frame_rgb_tensor, numeric_tensor)
-                predicted_distance = prediction.item()*2
+                predicted_distance = prediction.item()
                 print(f"Predicted distance: {predicted_distance:.2f} m; ID: {next_id}")
                 angle_rel = calcola_angolo(x)
                 face_positions.append([predicted_distance, angle_rel, next_id])

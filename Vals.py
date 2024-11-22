@@ -39,6 +39,15 @@ def get_location(file_path):
         print(f"Errore nella lettura del file o nel parsing delle coordinate: {e}")
         return None, None
 
+def compass_face(file_path):
+    try:
+        with open(file_path, 'r') as file:
+            comp = float(file.readline().strip())
+            return comp
+    except (IOError, ValueError) as e:
+        print(f"Errore nella lettura del file o nel parsing delle coordinate: {e}")
+        return None
+    
 def calcola_angolo(x):
     width = int(cap_rgb.get(cv2.CAP_PROP_FRAME_WIDTH))
     cx=width/2
@@ -94,7 +103,7 @@ with open(ground_truth_file, "r") as file:
 # Variabili per tracciare l'errore
 total_error = 0.0
 total_predictions = 0
-angle=28.12
+angle=compass_face('Compass.txt')
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 frame_idx =0
 
@@ -179,15 +188,15 @@ while True:
             numeric_sequence_tensor = torch.stack(numeric_sequence).unsqueeze(0).to(device)  # Forma: [1, seq_length, 4]
             with torch.no_grad():
                 prediction = model(frame_rgb_tensor, numeric_tensor)
-                predicted_distance = prediction.item()*2
+                predicted_distance = prediction.item()
                 print(f"Predicted distance: {predicted_distance:.2f} m; ID: {next_id}")
                 angle_rel = calcola_angolo(x)
                 face_positions.append([predicted_distance, angle_rel, next_id])
-                cv2.rectangle(rgb_image, (x1, y1), (x2, y2), (0, 255, 0), 2)
+                '''cv2.rectangle(rgb_image, (x1, y1), (x2, y2), (0, 255, 0), 2)
                 cv2.putText(rgb_image, f"Human Face ID:{next_id}",
                             (x1, y1 - 10), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 0), 2)
                 cv2.putText(rgb_image, f"Distance: {predicted_distance:.2f} m",
-                            (x1, y1 - 25), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 0), 2)
+                            (x1, y1 - 25), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 0), 2)'''
                 next_id += 1
             error = abs(predicted_distance - depth_value)
             total_error += error
@@ -201,7 +210,7 @@ while True:
     if latitude is not None and longitude is not None:
         update_map(latitude, longitude, face_positions, angle)
     frame_idx += 1
-    cv2.imshow('Output', rgb_image)
+    #cv2.imshow('Output', rgb_image)
     mean_error = total_error / total_predictions if total_predictions > 0 else float('inf')
     print(f"Errore medio sulle predizioni: {mean_error:.4f} metri")
     # Premere il tasto q per uscire
